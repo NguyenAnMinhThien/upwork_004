@@ -1,3 +1,5 @@
+from selenium import webdriver
+
 #%%
 import datetime
 import subprocess
@@ -33,8 +35,8 @@ current_espn = url_espn + current_date
 tomorrow_espn= url_espn + tomorrow_date
 options = ChromeOptions()
 options.add_argument('--headless=new')
-# driver = uc.Chrome(options)
-driver = uc.Chrome()
+driver = webdriver.Chrome(options)
+# driver = uc.Chrome()
 driver.get(current_espn)
 
 #%%
