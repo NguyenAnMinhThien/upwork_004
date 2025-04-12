@@ -33,9 +33,6 @@ driver = uc.Chrome()
 driver.get(current_espn)
 
 #%%
-tomorrow_schedule = driver.find_element(By.CLASS_NAME,"ResponsiveTable")
-tomorrow_schedules = driver.find_elements(By.CLASS_NAME,"ResponsiveTable")
-tomorrow_schedule.text
 # #%%
 # # this script will run at the end of the day, after the result of this day has updated, there is no LIVE table row
 # # not finished: find the table contain schedule for tommorow
@@ -44,8 +41,11 @@ tomorrow_schedule.text
 #     # print(tomorrow_schedules[inx].text)
 #     print(tomorrow_schedules[inx].find_element(By.XPATH,'//div[contain(@class,"Table__Title")]'))
 #%%
-tomorrow_schedules[2].text
 #%%
+tomorrow_schedule = driver.find_element(By.CLASS_NAME,"ResponsiveTable")
+tomorrow_schedules = driver.find_elements(By.CLASS_NAME,"ResponsiveTable")
+tomorrow_schedule.text
+tomorrow_schedules[2].text
 table = tomorrow_schedules[2].find_element(By.TAG_NAME,"table").find_element(By.TAG_NAME,"tbody")
 matchups = table.find_elements(By.TAG_NAME,"tr")
 espn_data=list()

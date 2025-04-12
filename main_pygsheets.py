@@ -24,3 +24,24 @@ try:
 except Exception as e:
     pass
 # wks.set_dataframe(df,(2,1))
+
+
+# --
+# --trash
+# tomorrow_schedules = driver.find_elements(By.CLASS_NAME,"ResponsiveTable")
+# # tomorrow_schedule.text
+# # tomorrow_schedules[2].text
+# # if tomorrow_schedules[1] contain the corrected tommorw
+# table = tomorrow_schedules[1].find_element(By.TAG_NAME,"table").find_element(By.TAG_NAME,"tbody")
+# matchups = table.find_elements(By.TAG_NAME,"tr")
+# espn_data=list()
+# for tr in matchups:
+#     row_data = tr.text.split("\n")
+#     match = [''] * 20
+#     match[0] = current.strftime("%m") + "/" + str(int(current.strftime("%d"))+1) + "/" + current.strftime("%Y")
+#     match[2] = row_data[0]
+#     match[8] = row_data[2]
+#     match[1] = row_data[3]
+#     espn_data.append(match)
+# print(espn_data)
+
