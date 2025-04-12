@@ -1,28 +1,23 @@
 #%%
 import datetime
-import subprocess
-import pandas
-import time
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from undetected_chromedriver import ChromeOptions
 import undetected_chromedriver as uc
 
 
-import pygsheets
-def import_sheet(data):
-    #authorization
-    gc = pygsheets.authorize(client_secret='client_secret.json')
-    sh = gc.open_by_url('https://docs.google.com/spreadsheets/d/1tmS19xOtKI9Z0aHY0cuk3_Tl6fOe55U4Ifwu0yICEME/edit?gid=0#gid=0')
-    #select the first sheet
-    wks = sh[0]
-    for row in data:
-        try:
-            wks.append_table(values=row)
-        except Exception as e:
-            pass
-
+# import pygsheets
+# def import_sheet(data):
+#     #authorization
+#     gc = pygsheets.authorize(client_secret='client_secret.json')
+#     sh = gc.open_by_url('https://docs.google.com/spreadsheets/d/1tmS19xOtKI9Z0aHY0cuk3_Tl6fOe55U4Ifwu0yICEME/edit?gid=0#gid=0')
+#     #select the first sheet
+#     wks = sh[0]
+#     for row in data:
+#         try:
+#             wks.append_table(values=row)
+#         except Exception as e:
+#             pass
+#
 #%%
 url_espn = 'https://www.espn.com/mlb/schedule/_/date/'
 
@@ -62,12 +57,6 @@ for tr in matchups:
     match[8] = row_data[2]
     match[1] = row_data[3]
     espn_data.append(match)
-import_sheet(espn_data)
-
-#%%
-df = pandas.DataFrame(columns=[
-    'Date','Time','Team 1','Team 1 Rank','Team 1 Win Prob','Team 1 Run Line','Team 1 Run Line Odds','Team 1 Moneyline Odds','Team 2','Team 2 Rank','Team 2 Win Prob','Team 2 Run Line','Team 2 Run Line Odds','Team 2 Moneyline Odds','Total Over','Total Over Odds','Total Under','Total Under Odds','Team 1 Score','Team 2 Score'
-])
-
-
-#%%
+driver.quit()
+print(espn_data)
+# import_sheet(espn_data)
