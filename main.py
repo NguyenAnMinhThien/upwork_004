@@ -1,4 +1,6 @@
 import datetime
+import zipfile
+import os
 import time
 import re
 from selenium.webdriver.common.by import By
@@ -107,13 +109,100 @@ def scrape_rank():
         if toggle == 1 and (re.search("\d", rank_maybe)) == None and rank_maybe.strip() != '':
             rank_list.append(rank_maybe)
     return rank_list
+# add proxy heree
+
+PROXY_HOST = "154.6.115.218"  # rotating  web scraping proxy
+PROXY_PORT = 6687
+PROXY_USER = "qaibfgfd"
+PROXY_PASS = "wdquza3u1uoh"
+
+manifest_json = """
+{
+    "name": "Chrome Proxy",
+    "description": "Use proxy with auth",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "permissions": [
+        "proxy",
+        "storage",
+        "scripting",
+        "tabs",
+        "unlimitedStorage",
+        "webRequest",
+        "webRequestAuthProvider"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_title": "Proxy Extension"
+    }
+}
+"""
+
+background_js = """
+chrome.runtime.onInstalled.addListener(() => {
+    const config = {
+        mode: "fixed_servers",
+        rules: {
+            singleProxy: {
+                scheme: "http",
+                host: "%s",
+                port: parseInt(%s)
+            },
+            bypassList: ["localhost"]
+        }
+    };
+    chrome.proxy.settings.set(
+        {value: config, scope: "regular"},
+        () => {}
+    );
+});
+
+chrome.webRequest.onAuthRequired.addListener(
+    function(details) {
+        return {
+            authCredentials: {
+                username: "%s",
+                password: "%s"
+            }
+        };
+    },
+    {urls: ["<all_urls>"]},
+    ["blocking"]
+);
+""" % (PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS)
+
+
+def get_chromedriver(use_proxy=False, user_agent=None):
+    path = os.path.dirname(os.path.abspath(__file__))
+    chrome_options = uc.ChromeOptions()
+    if use_proxy:
+        pluginfile = "proxy_auth_plugin.zip"
+
+        with zipfile.ZipFile(pluginfile, "w") as zp:
+            zp.writestr("manifest.json", manifest_json)
+            zp.writestr("background.js", background_js)
+        chrome_options.add_extension(pluginfile)
+        chrome_options.add_argument(
+            "--proxy-server=http://%s:%s" % (PROXY_HOST, PROXY_PORT)
+        )
+        chrome_options.add_argument('--headless=new')
+    if user_agent:
+        chrome_options.add_argument("--user-agent=%s" % user_agent)
+    driver = uc.Chrome(options=chrome_options)
+    return driver
 
 if __name__ == "__main__":
-    options = ChromeOptions()
-    proxy = rotate_proxy()
-    options.add_argument(f"--proxy-server=http://{proxy}")
-    options.add_argument('--headless=new')
-    driver = uc.Chrome(options)
+    # options = ChromeOptions()
+    # proxy = rotate_proxy()
+    # options.add_argument(f"--proxy-server=http://qaibfgfd:wdquza3u1uoh@{proxy}")
+    # options.add_argument('--headless=new')
+    # driver = uc.Chrome(options)
+    driver = get_chromedriver(use_proxy=True)
 
     url_espn = 'https://www.espn.com/mlb/schedule/_/date/'
     current = datetime.datetime.now()
