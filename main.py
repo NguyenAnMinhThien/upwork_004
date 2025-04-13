@@ -11,6 +11,7 @@ def rotate_proxy():
     return random.choice(proxy)
 def scrape_espn(url):
     global driver
+    print(datetime.datetime.now(),"\n")
     driver.get(url)
     time.sleep(2)
     tomorrow_schedules = driver.find_elements(By.CLASS_NAME,"ResponsiveTable")
@@ -57,6 +58,7 @@ def scrape_espn(url):
     return (espn_finals)
 def scrape_sport_book():
     global driver
+    print(datetime.datetime.now())
     driver.switch_to.new_window("newtab")
     driver.get('https://sportsbook.draftkings.com/leagues/baseball/mlb')
     time.sleep(2)
@@ -90,6 +92,7 @@ def scrape_sport_book():
 
 def scrape_rank():
     global driver
+    print(datetime.datetime.now())
     driver.switch_to.new_window("newtab")
     driver.get('https://www.mlb.com/standings/mlb')
     time.sleep(2)
