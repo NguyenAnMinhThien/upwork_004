@@ -19,7 +19,7 @@ def import_sheet(data):
     # authorization
     gc = pygsheets.authorize(client_secret='client_secret.json')
     sh = gc.open_by_url(
-        'https://docs.google.com/spreadsheets/d/1tmS19xOtKI9Z0aHY0cuk3_Tl6fOe55U4Ifwu0yICEME/edit?gid=0#gid=0')
+        'https://docs.google.com/spreadsheets/d/1d0si0OqSwAL9gvsUJxxcQalcUTsi-qkrciWhdCXxQtQ/edit?gid=0#gid=0')
     # select the first sheet
     wks = sh[0]
     for row in data:
@@ -37,7 +37,7 @@ def scrape_espn(driver,url):
     tomorrow_schedules = driver.find_elements(By.CLASS_NAME, "ResponsiveTable")
     # heree
     # 1.Create a list of all link game
-    table = tomorrow_schedules[1].find_element(By.TAG_NAME, "table").find_element(By.TAG_NAME, "tbody")
+    table = tomorrow_schedules[0].find_element(By.TAG_NAME, "table").find_element(By.TAG_NAME, "tbody")
     matchups = table.find_elements(By.TAG_NAME, "tr")
     link_games = list()
     for item in matchups:
@@ -72,6 +72,7 @@ def scrape_espn(driver,url):
             print("Finished getting predictor")
             espn_final.append(matchup_predictor[0].text)
             espn_final.append(matchup_predictor[1].text)
+            espn_final.append(link_game)
             espn_finals.append(espn_final.copy())
             espn_final.clear()
         except Exception as e:
@@ -164,9 +165,9 @@ def combine_list(espn_list, run_total_money_list, rank_list):
         final_list.append(dict_match_name[item[1].strip()][2])
 
         # For team2
-        final_list.append(item[2])
+        final_list.append(item[3])
         final_list.append(rank_list.index(item[3].strip()) + 1)
-        final_list.append(item[5].replace("\n", ''))
+        final_list.append(item[6].replace("\n", ''))
         final_list.append("'"+dict_match_name[item[3].strip()][0].split("\n")[0])
         final_list.append(dict_match_name[item[3].strip()][0].split("\n")[1])
         final_list.append(dict_match_name[item[3].strip()][2])
@@ -177,6 +178,12 @@ def combine_list(espn_list, run_total_money_list, rank_list):
         # For total under
         final_list.append(dict_match_name[item[3].strip()][1].split("\n")[1])
         final_list.append(dict_match_name[item[3].strip()][1].split("\n")[2])
+
+        # For test scores
+        final_list.append('')
+        final_list.append('')
+        # For the link_game
+        final_list.append(item[-1])
 
         final_lists.append(final_list.copy())
         final_list.clear()
