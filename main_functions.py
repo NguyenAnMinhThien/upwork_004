@@ -15,21 +15,76 @@ def rotate_proxy():
     return random.choice(proxy)
 
 
-def import_sheet(data):
+def import_sheet(data,score_lists):
     # authorization
     gc = pygsheets.authorize(client_secret='client_secret.json')
     sh = gc.open_by_url(
-        'https://docs.google.com/spreadsheets/d/1d0si0OqSwAL9gvsUJxxcQalcUTsi-qkrciWhdCXxQtQ/edit?gid=0#gid=0')
-    # select the first sheet
+        'https://docs.google.com/spreadsheets/d/1tmS19xOtKI9Z0aHY0cuk3_Tl6fOe55U4Ifwu0yICEME/edit?gid=0#gid=0')
+    # 1.append schedule for tomorrow
     wks = sh[0]
     for row in data:
         try:
             wks.append_table(values=row)
         except Exception as e:
             pass
+    # 2.Update testscores for previous winning
+    with open('status.txt',mode='r',encoding='utf-8') as file:
+        previous_line = file.readline()
+    previous_line = int(previous_line)
 
+    wks.update_values(f'S{previous_line}:T{previous_line+score_lists.__len__()-1}',score_lists)
 
-def scrape_espn(driver,url):
+    with open('status.txt',mode='w',encoding='utf-8') as file:
+        previous_line = file.writelines(str(previous_line+score_lists.__len__()))
+def scrape_espn_result(driver,previous_espn,espn_list):
+
+    driver.get(previous_espn)
+
+    tomorrow_schedules = driver.find_elements(By.CLASS_NAME, "ResponsiveTable")
+    pattern = r'([A-Z]+ [0-9]+), ([A-Z]+ [0-9]+)'
+    # heree
+    # 1.Create a list of all link game
+    score_list = list()
+    score_lists = list()
+    try:
+        table = tomorrow_schedules[0].find_element(By.TAG_NAME, "table").find_element(By.TAG_NAME, "tbody")
+        matchups = table.find_elements(By.TAG_NAME, "tr")
+        for idx in range(matchups.__len__()):
+            if not matchups[idx].text.__contains__("Postponed"):
+                text = (matchups[idx].text.split("\n")[3])
+                print(espn_list[idx])
+                print(text)
+                match_obj = re.match(pattern, text)
+                if match_obj:
+                    print("Match found!")
+                    team1 = match_obj.group(1)
+                    team2 = match_obj.group(2)
+                    team1_name = team1.split()[0]
+                    new_pattern = '.*'.join( list(team1_name))
+                    # Assume team1 win
+                    if (bool(re.search(new_pattern,espn_list[idx][1].upper()))):
+                        score_list.append(team1.split()[1])
+                        score_list.append(team2.split()[1])
+                    else:
+                        #         Team2 win, get result from regular of Team 1
+                        score_list.append(team2.split()[1])
+                        score_list.append(team1.split()[1])
+                else:
+                    print("No match found.")
+
+            else:
+                score_list.append("Postponed")
+                score_list.append("Postponed")
+            print(score_list)
+            score_lists.append(score_list.copy())
+            score_list.clear()
+
+    except Exception as e:
+        print(e)
+        pass
+    return (score_lists)
+
+def scrape_espn(driver,url,rank_list):
     print(datetime.datetime.now(), "\n")
     driver.get(url)
     WebDriverWait(driver, 5).until(
@@ -64,6 +119,14 @@ def scrape_espn(driver,url):
             WebDriverWait(driver, 5).until(
                 expected_conditions.presence_of_element_located((By.CLASS_NAME, "PageLayout__Main")))
             print("Getting content in section")
+
+            header = driver.find_element(By.CLASS_NAME,"Gamestrip__StickyContainer")
+            team1_name = header.text.split()[0]
+            if "AM" in header.text:
+                team2_name = (header.text.split()[header.text.split().index("AM")+1])
+            else:
+                team2_name = (header.text.split()[header.text.split().index("PM") + 1])
+
             # espn_news = driver.find_element(By.CLASS_NAME, "PageLayout__Main").find_element(By.XPATH,
             #                                                                                 '//section[@data-testid="prism-LayoutCard"]')
             # # Surely will get corrected, no use this
@@ -80,6 +143,9 @@ def scrape_espn(driver,url):
             matchup_predictor = driver.find_elements(By.CLASS_NAME, "matchupPredictor__teamValue")
             print("Finished getting predictor")
             espn_final = data_row[:5]
+            # Don't want to use team name at outside
+            espn_final[1] = team1_name
+            espn_final[3] = team2_name
             espn_final.append(matchup_predictor[0].text)
             espn_final.append(matchup_predictor[1].text)
             espn_final.append(data_row[-1])
@@ -89,19 +155,21 @@ def scrape_espn(driver,url):
             print(f"Exception at: {data_row}\n")
             pass
     #     1,2,5 is left; 3,4,6 is right
+    # Create a matrix table between mismatched name and matched name
     dict_match_name = dict()
     for rtm in espn_finals:
         mismatch_name1 = rtm[1]
         mismatch_name2 = rtm[3]
         for item in rank_list:
-            if item.__contains__(mismatch_name1.split()[-1]):
+            if item.__contains__(mismatch_name1.strip()):
                 dict_match_name[mismatch_name1] = item
-            elif item.__contains__(mismatch_name2.split()[-1]):
+            elif item.__contains__(mismatch_name2.strip()):
                 dict_match_name[mismatch_name2] = item
         #         Assign again the value of some wrong assign dueto the previous one.
-    dict_match_name['Chicago'] = 'Chicago Cubs'
-    dict_match_name['New York'] = 'New York Yankees'
-    dict_match_name['Los Angeles'] = 'Los Angeles Dodgers'
+    #     Now, we use full mismatch name, we have a precised dict match with rank_list
+    # dict_match_name['Chicago'] = 'Chicago Cubs'
+    # dict_match_name['New York'] = 'New York Yankees'
+    # dict_match_name['Los Angeles'] = 'Los Angeles Dodgers'
     print(dict_match_name)
     for item in espn_finals:
         item[1] = dict_match_name[item[1]]
@@ -110,7 +178,7 @@ def scrape_espn(driver,url):
     return espn_finals
 
 
-def scrape_sport_book(driver):
+def scrape_sport_book(driver,rank_list):
     print(datetime.datetime.now())
     # 1. Consider if this time is corrected to scrape ?
     driver.get('https://sportsbook.draftkings.com/leagues/baseball/mlb')
@@ -130,19 +198,28 @@ def scrape_sport_book(driver):
     for odd_table in odd_tables:
         odd_rows = odd_table.find_elements(By.TAG_NAME, "tr")
         # 2.Scrape rows in that table
+
         for odd_row in odd_rows:
-            if (odd_row.text.__contains__("TOMORROW") == False):
-                team_name = odd_row.find_element(By.TAG_NAME, "th").text.split("\n")[0]
-                if team_name.__contains__("AM") or team_name.__contains__("PM"):
-                    team_name = odd_row.find_element(By.TAG_NAME, "th").text.split("\n")[1]
-                draftking_list.append(team_name)
-                # print(team_name)
-                run_total_money = odd_row.find_elements(By.TAG_NAME, "td")
-                draftking_list.append(run_total_money[0].text)
-                draftking_list.append(run_total_money[1].text)
-                draftking_list.append(run_total_money[2].text)
-                draftking_lists.append(draftking_list.copy())
-                draftking_list.clear()
+            # May be header contains in this element
+            if odd_row.text.__contains__("TOMORROW") or odd_row.text.__contains__("TODAY"):
+                continue
+            team_name = odd_row.find_element(By.TAG_NAME, "th").text.split("\n")[0]
+            if team_name.__contains__("AM") or team_name.__contains__("PM"):
+                team_name = odd_row.find_element(By.TAG_NAME, "th").text.split("\n")[1]
+            draftking_list.append(team_name)
+            print("team name")
+            print(team_name)
+            run_total_money = odd_row.find_elements(By.TAG_NAME, "td")
+            for item in run_total_money:
+                print("each row")
+                print(item.text)
+                draftking_list.append(item.text)
+            #                draftking_list.append(run_total_money[0].text)
+            #                draftking_list.append(run_total_money[1].text)
+            #                draftking_list.append(run_total_money[2].text)
+            draftking_lists.append(draftking_list.copy())
+            draftking_list.clear()
+
     return draftking_lists
 
 

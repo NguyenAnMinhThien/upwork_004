@@ -5,7 +5,8 @@ import os
 from selenium import webdriver
 import  main_functions
 from bottle_neck import final_lists
-
+from selenium.webdriver.chrome.service import  Service
+service = Service('C:\\Users\\Pc\\.cache\\selenium\\chromedriver\\win64\\135.0.7049.84\\chromedriver.exe')
 
 def get_chromedriver(use_proxy=False, user_agent=None):
     PROXY_HOST = "154.6.115.218"  # rotating  web scraping proxy
@@ -84,45 +85,54 @@ def get_chromedriver(use_proxy=False, user_agent=None):
         chrome_options.add_argument(
             "--proxy-server=http://%s:%s" % (PROXY_HOST, PROXY_PORT)
         )
-        # chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--headless=new')
     if user_agent:
         chrome_options.add_argument("--user-agent=%s" % user_agent)
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options,service=service)
     return driver
 
 if __name__ == "__main__":
-    # options = ChromeOptions()
-    # proxy = rotate_proxy()
-    # options.add_argument(f"--proxy-server=http://qaibfgfd:wdquza3u1uoh@{proxy}")
-    # options.add_argument('--headless=new')
-    # driver = uc.Chrome(options)
+    driver = get_chromedriver(use_proxy=True)
 
-    # driver = get_chromedriver(use_proxy=True)
-    #
-    # url_espn = 'https://www.espn.com/mlb/schedule/_/date/'
-    # current = datetime.datetime.now()
-    # current_date = current.strftime("%Y") + current.strftime("%m") + current.strftime("%d")
-    # tomorrow_date =  current.strftime("%Y") + current.strftime("%m") +str(int(current.strftime("%d"))+1)
-    # current_espn = url_espn + current_date
-    # tomorrow_espn= url_espn + tomorrow_date
-    #
-    # print("\nIs scraping Schedule\n")
-    # espn_list = main_functions.scrape_espn(driver,current_espn)
-    # print(espn_list)
-    # print("\nIs scraping TotalOdd\n")
-    # run_total_money_list = main_functions.scrape_sport_book(driver)
-    # print(run_total_money_list)
-    # print("\nIs scraping Ranking\n")
-    # rank_list = main_functions.scrape_rank(driver)
-    # print(rank_list)
+    url_espn = 'https://www.espn.com/mlb/schedule/_/date/'
+    current = datetime.datetime.now()
+    current_date = current.strftime("%Y") + current.strftime("%m") + current.strftime("%d")
+    tomorrow_date =  current.strftime("%Y") + current.strftime("%m") +str(int(current.strftime("%d"))+1)
+    current_espn = url_espn + current_date
+    tomorrow_espn= url_espn + tomorrow_date
 
-    espn_list = bottle_neck.espn_list
-    run_total_money_list = bottle_neck.run_total_money_list
-    rank_list = bottle_neck.rank_list
+    print("\nIs scraping Ranking\n")
+    rank_list = main_functions.scrape_rank(driver)
+    print(rank_list)
 
-    print("Is pulishing data")
+    print("\nIs scraping Schedule\n")
+    espn_list = main_functions.scrape_espn(driver,tomorrow_espn,rank_list)
+    # recreate the espn_list
+    print(espn_list)
+
+    print("\nIs scraping TotalOdd\n")
+    run_total_money_list = main_functions.scrape_sport_book(driver,rank_list)
+    print(run_total_money_list)
+
+    driver.quit()
+
+    # espn_list = bottle_neck.espn_list
+    # run_total_money_list = bottle_neck.run_total_money_list
+    # rank_list = bottle_neck.rank_list
+
+
+
+    previous = current + datetime.timedelta(-1)
+    previous_date = previous.strftime("%Y") + previous.strftime("%m") + previous.strftime("%d")
+    previous_espn = url_espn + previous_date
+    print(previous_espn)
+    previous_espn = 'https://www.espn.com/mlb/schedule/_/date/20250414'
+    print("\nIs scraping result\n")
+    score_lists = main_functions.scrape_espn_result(driver, previous_espn, espn_list)
+
+    print("Is appending schedule data")
     final_lists =  main_functions.combine_list(espn_list, run_total_money_list, rank_list)
-    main_functions.import_sheet(final_lists)
-    print("here")
+    main_functions.import_sheet(final_lists,score_lists)
+    print("Finished")
 
 
