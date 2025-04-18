@@ -9,7 +9,6 @@ import pygsheets
 import proxyscrape
 from bottle_neck import run_total_money_list, rank_list
 
-
 def rotate_proxy():
     proxy = proxyscrape.proxy
     return random.choice(proxy)
@@ -22,24 +21,43 @@ def import_sheet(data,score_lists):
         'https://docs.google.com/spreadsheets/d/1tmS19xOtKI9Z0aHY0cuk3_Tl6fOe55U4Ifwu0yICEME/edit?gid=0#gid=0')
     # 1.append schedule for tomorrow
     wks = sh[0]
-    for row in data:
-        try:
-            wks.append_table(values=row)
-        except Exception as e:
-            pass
+
+    wks.update_values(f'S2:T{2 +score_lists.__len__()-1}',score_lists)
+    wks.insert_rows(1, number=data.__len__(), values=data)
+
+    # Not use status.txt to store previous data
+    # wks.insert_rows(1, number=1, values=data[0])
+    # wks.insert_rows(2, number=1, values=data[1])
+    # wks.insert_rows(3, number=1, values=data[2])
+    # for idx in data.__len__():
+    #     try:
+    #         wks.insert_rows(2+idx,values=data[idx])
+    #     except Exception as e:
+    #         pass
     # 2.Update testscores for previous winning
-    with open('status.txt',mode='r',encoding='utf-8') as file:
-        previous_line = file.readline()
-    previous_line = int(previous_line)
-
-    wks.update_values(f'S{previous_line}:T{previous_line+score_lists.__len__()-1}',score_lists)
-
-    with open('status.txt',mode='w',encoding='utf-8') as file:
-        previous_line = file.writelines(str(previous_line+score_lists.__len__()))
+    # with open('status.txt',mode='r',encoding='utf-8') as file:
+    #     previous_line = file.readline()
+    # previous_line = int(previous_line)
+    #
+    #
+    # with open('status.txt',mode='w',encoding='utf-8') as file:
+    #     previous_line = file.writelines(str(previous_line+score_lists.__len__()))
 def scrape_espn_result(driver,previous_espn,espn_list):
 
     driver.get(previous_espn)
-
+    WebDriverWait(driver, 5).until(
+        expected_conditions.presence_of_element_located((By.XPATH, '//*[contains(text(),"Team Schedules")]')))
+    # 1.Generate the abrevation list of team names, the beginning solution is just base on the team name, but it is so strict because some patterns still are matched in other team names. So, generate the abreviation table directly from website
+    team_abrivation = driver.find_element(By.XPATH, '//*[contains(text(),"Team Schedules")]').find_element(By.XPATH,
+                                                                                                           './..')
+    dict_abreviation = dict()
+    abri = team_abrivation.find_elements(By.TAG_NAME, "option")
+    for item in abri:
+        if item.get_attribute("data-param-value") == None:
+            continue
+        else:
+            dict_abreviation[item.get_attribute("data-param-value").upper()] = item.get_attribute("value")
+    print(dict_abreviation)
     tomorrow_schedules = driver.find_elements(By.CLASS_NAME, "ResponsiveTable")
     pattern = r'([A-Z]+ [0-9]+), ([A-Z]+ [0-9]+)'
     # heree
@@ -60,23 +78,26 @@ def scrape_espn_result(driver,previous_espn,espn_list):
                     team1 = match_obj.group(1)
                     team2 = match_obj.group(2)
                     team1_name = team1.split()[0]
-                    new_pattern = '.*'.join( list(team1_name))
+                    team2_name = team2.split()[0]
                     # Assume team1 win
-                    if (bool(re.search(new_pattern,espn_list[idx][1].upper()))):
+                    if dict_abreviation[team1_name] == espn_list[idx][1].strip() and dict_abreviation[team2_name] == espn_list[idx][3].strip():
                         score_list.append(team1.split()[1])
                         score_list.append(team2.split()[1])
-                    else:
+                    elif dict_abreviation[team2_name] == espn_list[idx][1].strip() and dict_abreviation[team1_name] == espn_list[idx][3].strip():
                         #         Team2 win, get result from regular of Team 1
                         score_list.append(team2.split()[1])
                         score_list.append(team1.split()[1])
                 else:
                     print("No match found.")
+                    raise Exception
 
             else:
                 score_list.append("Postponed")
                 score_list.append("Postponed")
             print(score_list)
             score_lists.append(score_list.copy())
+            if score_lists.__len__() == espn_list.__len__():
+                print("Data between score_lists and espn_list matched")
             score_list.clear()
 
     except Exception as e:
@@ -85,6 +106,18 @@ def scrape_espn_result(driver,previous_espn,espn_list):
     return (score_lists)
 
 def scrape_espn(driver,url,rank_list):
+    driver.get('https://www.espn.com/mlb/stats/team/_/table/batting/sort/runs/dir/desc')
+    rank_maybe = driver.find_elements(By.CLASS_NAME, "Table__TBODY")
+    rank_run_list = list()
+    if bool(re.search("[a-z]+ [a-z]+", rank_maybe[0].text.lower())):
+        rank_run_list = rank_maybe[0]
+    elif bool(re.search("[a-z]+ [a-z]+", rank_maybe[1].text.lower())):
+        rank_run_list = rank_maybe[1]
+
+    rank_run_temp = rank_run_list.text.split("\n")
+    rank_run_dict = {rank_run_temp[2 * n + 1]: rank_run_temp[2 * n ] for n in range(int(rank_run_temp.__len__() / 2))}
+    print("Rank of run list",rank_run_dict)
+
     print(datetime.datetime.now(), "\n")
     driver.get(url)
     WebDriverWait(driver, 5).until(
@@ -98,12 +131,46 @@ def scrape_espn(driver,url,rank_list):
     for item in matchups:
         link_game = item.find_element(By.CLASS_NAME, "date__col").find_element(By.TAG_NAME, "a").get_attribute("href")
         game_team_pitcher = item.text.split("\n")
+        # we don't need the pitcher name
+        #
+        # for pitching_matchup in game_team_pitcher:
+        #     if pitching_matchup.__contains__(" vs "):
+        #         pitching = pitching_matchup
+        #         break
 
-        for pitching_matchup in game_team_pitcher:
-            if pitching_matchup.__contains__(" vs "):
-                pitching = pitching_matchup
-                break
-        data_row = [game_team_pitcher[3],game_team_pitcher[0],pitching.split(" vs ")[0],game_team_pitcher[2],pitching.split(" vs ")[1],link_game]
+        check_list = ["New York","Los Angeles", "Chicago"]
+        if game_team_pitcher[0].strip() in check_list:
+            if game_team_pitcher[0].strip() == "New York" and "mets" in link_game.split('/')[-1]:
+                game_team_pitcher[0] = "New York Mets"
+            elif game_team_pitcher[0].strip() == "New York" and "yankees" in link_game.split('/')[-1]:
+                game_team_pitcher[0] = "New York Yankees"
+            elif game_team_pitcher[0].strip() == "Los Angeles" and "angel" in link_game.split('/')[-1]:
+                game_team_pitcher[0] = "Los Angeles Angels"
+            elif game_team_pitcher[0].strip() == "Los Angeles" and "dodgers" in link_game.split('/')[-1]:
+                game_team_pitcher[0] = "Los Angeles Dodgers"
+            elif game_team_pitcher[0].strip() == "Chicago" and "white-sox" in link_game.split('/')[-1]:
+                game_team_pitcher[0] = "Chicago White Sox"
+            elif game_team_pitcher[0].strip() == "Chicago" and "cubs" in link_game.split('/')[-1]:
+                game_team_pitcher[0] = "Chicago Cubs"
+
+
+        if game_team_pitcher[2].strip() in check_list:
+            if game_team_pitcher[2].strip() == "New York" and "mets" in link_game.split('/')[-1]:
+                game_team_pitcher[2] = "New York Mets"
+            elif game_team_pitcher[2].strip() == "New York" and "yankees" in link_game.split('/')[-1]:
+                game_team_pitcher[2] = "New York Yankees"
+            elif game_team_pitcher[2].strip() == "Los Angeles" and "angel" in link_game.split('/')[-1]:
+                game_team_pitcher[2] = "Los Angeles Angels"
+            elif game_team_pitcher[2].strip() == "Los Angeles" and "dodgers" in link_game.split('/')[-1]:
+                game_team_pitcher[2] = "Los Angeles Dodgers"
+            elif game_team_pitcher[2].strip() == "Chicago" and "white-sox" in link_game.split('/')[-1]:
+                game_team_pitcher[2] = "Chicago White Sox"
+            elif game_team_pitcher[2].strip() == "Chicago" and "cubs" in link_game.split('/')[-1]:
+                game_team_pitcher[2] = "Chicago Cubs"
+        # data_row = [game_team_pitcher[3],game_team_pitcher[0],pitching.split(" vs ")[0],game_team_pitcher[2],pitching.split(" vs ")[1],link_game]
+        # position 2 and 4 is for run_rank later
+        data_row = [game_team_pitcher[3],game_team_pitcher[0],'',game_team_pitcher[2],'',link_game]
+
 
         # data_row: it is combined with all data necessary before enter to each page to get predictor
         link_games.append(data_row)
@@ -120,12 +187,12 @@ def scrape_espn(driver,url,rank_list):
                 expected_conditions.presence_of_element_located((By.CLASS_NAME, "PageLayout__Main")))
             print("Getting content in section")
 
-            header = driver.find_element(By.CLASS_NAME,"Gamestrip__StickyContainer")
-            team1_name = header.text.split()[0]
-            if "AM" in header.text:
-                team2_name = (header.text.split()[header.text.split().index("AM")+1])
-            else:
-                team2_name = (header.text.split()[header.text.split().index("PM") + 1])
+            # header = driver.find_element(By.CLASS_NAME,"Gamestrip__StickyContainer")
+            # team1_name = header.text.split()[0]
+            # if "AM" in header.text:
+            #     team2_name = (header.text.split()[header.text.split().index("AM")+1])
+            # else:
+            #     team2_name = (header.text.split()[header.text.split().index("PM") + 1])
 
             # espn_news = driver.find_element(By.CLASS_NAME, "PageLayout__Main").find_element(By.XPATH,
             #                                                                                 '//section[@data-testid="prism-LayoutCard"]')
@@ -144,8 +211,8 @@ def scrape_espn(driver,url,rank_list):
             print("Finished getting predictor")
             espn_final = data_row[:5]
             # Don't want to use team name at outside
-            espn_final[1] = team1_name
-            espn_final[3] = team2_name
+            # espn_final[1] = team1_name
+            # espn_final[3] = team2_name
             espn_final.append(matchup_predictor[0].text)
             espn_final.append(matchup_predictor[1].text)
             espn_final.append(data_row[-1])
@@ -173,12 +240,14 @@ def scrape_espn(driver,url,rank_list):
     print(dict_match_name)
     for item in espn_finals:
         item[1] = dict_match_name[item[1]]
+        item[2] = dict_match_name[item[1]]
         item[3] = dict_match_name[item[3]]
+        item[4] = dict_match_name[item[3]]
 
     return espn_finals
 
 
-def scrape_sport_book(driver,rank_list):
+def scrape_sport_book(driver):
     print(datetime.datetime.now())
     # 1. Consider if this time is corrected to scrape ?
     driver.get('https://sportsbook.draftkings.com/leagues/baseball/mlb')
@@ -265,6 +334,7 @@ def combine_list(espn_list, run_total_money_list, rank_list):
         # For team1
         final_list.append(item[1])
         final_list.append(rank_list.index(item[1].strip()) + 1)
+        final_list.append(item[2])
         final_list.append(item[5].replace("\n", ''))
         final_list.append("'"+dict_match_name[item[1].strip()][0].split("\n")[0])
         final_list.append(dict_match_name[item[1].strip()][0].split("\n")[1])
@@ -273,6 +343,7 @@ def combine_list(espn_list, run_total_money_list, rank_list):
         # For team2
         final_list.append(item[3])
         final_list.append(rank_list.index(item[3].strip()) + 1)
+        final_list.append(item[4])
         final_list.append(item[6].replace("\n", ''))
         final_list.append("'"+dict_match_name[item[3].strip()][0].split("\n")[0])
         final_list.append(dict_match_name[item[3].strip()][0].split("\n")[1])
